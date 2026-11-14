@@ -10,14 +10,16 @@ public class BingoCard {
     private int increment; // increments between columns
     private int dimensions; // assumes only square cards
     final String middle = " 0"; // String for free space, code designed for it to be 2-digits long
-    
-    final String[] winPatterns = {"Horizontal", "Vertical", "Four-Corners", "X", "Blackout"} // win patterns
-    private int patternIndex;
 
     private int[] usedNums = new int[75]; // stores numbers called, 75 is max size
     private int usedNumsAmount = 0; // number of numbers called
     private String calledNums = "";
 
+    // used to color numbers, show that numbers have been tagged on card
+    final String reset = "\u001B[0m"; // resets color scheme
+    final String highlight = "\u001B[42;30m"; // color scheme = black text w/ green highlight
+
+    // creates bingo card of dimensions d x d with increments of 1 - inc w/ + inc each column
     public BingoCard (int d, int inc) {
         dimensions = d;
         increment = inc;
@@ -32,6 +34,7 @@ public class BingoCard {
         card += "col:  0    1    2    3    4";
     }
 
+    // creating board row by row
     private String rowLine() {
         String output = "";
         output += "+----+----+----+----+----+\n";
@@ -45,6 +48,7 @@ public class BingoCard {
         return output;
     }
 
+    // chooses distinct number to be in cell based mostly off column (only uses row to check if middle)
     private String rowNumber(int c) {
         String output = "";
         if (c == 2 && currentRow == 2) {
@@ -54,7 +58,7 @@ public class BingoCard {
         }
 
         int n = (int) (Math.random()*increment + 1 + c*increment); // setting random number between
-        while (avoidDup(c, n)) {
+        while (avoidDup(c, n)) { // ensures all numbers distinct
             n = (int) (Math.random()*increment + 1 + c*increment);
         }
         output += "" + n;
@@ -64,19 +68,21 @@ public class BingoCard {
         }
 
         nums[currentRow][c] = n;
-        tagged[currentRow][c] = false; // only used in setup, so all tagged is false
+        tagged[currentRow][c] = false; // this is only used in setup, so all tagged is false
         return output;
     }
 
+    // checks whether a number is already on the card
     private boolean avoidDup(int col, int n) {
         for (int i = 0; i < currentRow; i++) {
-            if (n == nums[col][i]) {
+            if (n == nums[i][col]) {
                 return true;
             }
         }
         return false;
     }
 
+    // checks whether a number has already been called
     private boolean avoidDup(int n) {
         for (int i = 0; i < usedNumsAmount; i++) {
             if (n == usedNums[i]) {
@@ -86,6 +92,7 @@ public class BingoCard {
         return false;
     }
 
+    // returns the string version of the card
     public String toString() {
         return card;
     }
@@ -103,13 +110,7 @@ public class BingoCard {
         }
     }
 
-    // defines and returns the win pattern
-    public String generateWinPattern() {
-        patternIndex = (int) (Math.random()*winPatterns.length());
-        return winPatterns[patternIndex];
-    }
-
-    // calls a number
+    // calls and returns a distinct number
     public int callNum() {
         int n = (int) (Math.random()*74 + 1); // 1 - 75 inclusively
 
@@ -127,9 +128,14 @@ public class BingoCard {
         return n;
     }
 
+    // returns the number in (r,c) on the card
+    public int getNum(int r, int c) {
+        return nums[r][c];
+    } 
+
     // returns whether number n has been called
     public boolean checkNumCalled(int n) {
-        for (int i = 0; i < usedNumsAmount) {
+        for (int i = 0; i < usedNumsAmount; i++) {
             if (n == usedNums[i]) {
                 return true;
             }
@@ -137,40 +143,43 @@ public class BingoCard {
         return false;
     }
 
+    // returns the string of called numbers
     public String getCalledNums() {
         return calledNums;
     }
 
+    // returns whether space (r,c) has been tagged or not
     public boolean getTag(int r, int c) {
         return tagged[r][c];
     }
     
-    // records space at (r,c) has been tagged
-    public void updateTag(int r; int c) {
-        tagged[r][c] = true;
-    }
-
-    public int getNum(int r, int c) {
-        return nums[r][c];
-    } 
-
-    public boolean checkWin() {
-        // {"Horizontal", "Vertical", "Four-Corners", "X", "Blackout"}
-        Stirng win = winPatterns[patternIndex];
-
-        if (win.equals("Horizontal")) {
-            return checkHorzontal();
-        } else if (wins.equals("Vertical")) {
-            return checkVertical();
-        } else if (wins.equals("Four-Corners")) {
-            return checkCorners();
-        } else if (wins.equals("X")) {
-            return checkX();
-        } else { // here it's blackout
-            return checkBlackout();
+    // tags a space, returns true if has tagged and false if already tagged
+    public boolean tagSpace(int r, int c) {
+        if (tagged[r][c]) {
+            return false;
         }
+
+        tagged[r][c] = true;
+        int n = getNum(r,c);
+        int digitLength = 2;
+        int index = card.indexOf(" " + n + " ") + 1;
+
+
+        if (n / 10 == 0) { // if one digit
+            digitLength--;
+        }
+
+        card = card.substring(0,index) + highlight + card.substring(index, index + digitLength) + reset + card.substring(index + digitLength);
+        System.out.println(card);
+        return true;
     }
 
+    // checks if the player has won
+    public boolean checkWin() {
+        return checkHorizontal() || checkVertical() || checkDiagonals();
+    }
+
+    // checks if player has complete row
     private boolean checkHorizontal() {
         boolean temp;
         for (int i = 0; i < dimensions; i++) {
@@ -188,8 +197,9 @@ public class BingoCard {
         return false;
     }
 
+    // checks if player has complete column
     private boolean checkVertical() {
-        booleanl temp;
+        boolean temp;
         for (int i = 0; i < dimensions; i++) {
             temp = true;
             for (int j = 0; j < dimensions && temp; j++) {
@@ -205,27 +215,18 @@ public class BingoCard {
         return false;
     }
 
-    private boolean checkCorners() {
-        return tagged[0][0] && tagged[dimensions - 1][0] && tagged[0][dimensions - 1] && tagged[dimensions - 1]dimensions - 1];
-    }
-
-    private boolean checkX() {
-        boolean temp = true;
-        for (int i = 0; i < dimensions && temp; i++) {
-            temp = tagged[i][0 + i] && tagged[i][dimensions - 1 - i];
-            // checks cells and goes in by 1 each row
-        }
-        return temp;
-    }
-
-    private boolean checkBlackout() {
-        for (int i = 0; i < dimensions; i++) {
-            for (int j = 0; j < dimensions; j++) {
-                if (!tagged[i][j]) {
-                    return false;
-                }
+    // checks if player has complete diagonal
+    private boolean checkDiagonals() {
+        boolean temp1 = true; // left down diagonal
+        boolean temp2 = true; // right up diagonal
+        for (int i = 0; i < dimensions && (temp1 || temp2); i++) {
+            if (temp1) {
+                temp1 = tagged[i][0 + i];
+            }
+            if (temp2) {
+                temp2 = tagged[i][dimensions - 1 - i];
             }
         }
-        return true;
+        return temp1 || temp2;
     }
 }
